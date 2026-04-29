@@ -39,6 +39,9 @@ while ($hasNextPage) {
 					edges {
 						node {
 							entityId
+							inventory {
+								isInStock
+							}
 							sku
 							prices {
 								price {
@@ -69,10 +72,14 @@ while ($hasNextPage) {
 		$productCount++
 		
 		if ($p.sku) {
-			$allBcPrices[$p.sku] = [decimal]$($p.prices.price.value)
-			# Write-Host "SKU: $($p.sku) Price: $($p.prices.price.value)"
+			if ($p.inventory.isInStock) {
+				$allBcPrices[$p.sku] = [decimal]$($p.prices.price.value)
+				# Write-Host "SKU: $($p.sku) Price: $($p.prices.price.value)"
+			} else {
+				# Write-Host "SKU: $($p.sku) NOT in stock."
+			}			
 		} else {
-			Write-Host "No SKU from entity: $($p.entityId) Price: $($p.prices.price.value)"
+			# Write-Host "No SKU from entity: $($p.entityId) Price: $($p.prices.price.value)"
 		}			
 	}
 	
@@ -99,7 +106,7 @@ $passPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
 $sqlParams = @{
     ServerInstance         = $config.Celerant.ServerInstance
     Database               = $config.Celerant.Database
-    Query                  = "SELECT DISTINCT styles.STYLE AS SKU, tickets.PRICE AS PRICE FROM TB_STYLES styles
+    Query                  = "SELECT DISTINCT styles.STYLE AS SKU, tickets.PRICE AS PRICE, tickets.DESCRIPTION AS DESCRIPTION, tickets.DEPT AS DEPT FROM TB_STYLES styles
 								INNER JOIN VW_TICKETS tickets
 								ON tickets.STYLE_ID = styles.STYLE_ID
 								AND tickets.STORE_ID = 1
@@ -119,17 +126,21 @@ try {
     $foundInBC = 0
 
     foreach ($row in $posData) {
-        $sku = $row.SKU
-        $posPrice = [decimal]$row.Price
-		$bcPrice = [decimal]$allBcPrices[$sku]
+        $sku         = $row.SKU
+        $posPrice    = [decimal]$row.Price
+		$bcPrice     = [decimal]$allBcPrices[$sku]
+		$productName = $row.Description
+		$dept        = $row.Dept
 		
 		if ($allBcPrices.ContainsKey($sku)) {
 			# Write-Host "Match found for $($sku)! BigCommerce Price: $bcPrice Celerant Price: $posPrice"
 			$foundInBC++
 			
-			if ($allBcPrices[$sku] -ne $posPrice) {
+			if (($allBcPrices[$sku] -ne $posPrice) -and ($dept -notlike "*FOOD*")) {
 				$mismatches += [PSCustomObject]@{
                     SKU      = $sku
+					Name     = $productName
+					DEPT     = $dept
                     PosPrice = $posPrice
                     BcPrice  = $bcPrice
                     Diff     = $posPrice - $bcPrice
