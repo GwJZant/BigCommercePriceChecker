@@ -1,0 +1,3 @@
+This tool queries BigCommerce's GraphQL endpoint to pull SKU (product-level, not variant-level) and Price values and compares them against Celerant to identify price mismatches.
+
+NOTE: This tool is not perfect and mismatches will appear when Product Codes get reused in Celerant. For example if there are two "40000" products in Celerant and BigCommerce has a product page for one of those, there's a chance this tool will reference the wrong price that will depend *which* product was set up in BigCommerce relative to the order the product was entered in Celerant. Therefore, use this tool merely as a guide to understand which products warrant investigation.
