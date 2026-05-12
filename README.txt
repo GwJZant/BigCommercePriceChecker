@@ -1,10 +1,12 @@
-This tool queries BigCommerce's GraphQL endpoint to pull SKU (product-level, not variant-level) and Price values and compares them against Celerant to identify price mismatches. It specifically ONLY looks at products in BigCommerce that are "in stock" in order to weed out inactive items with sale prices.
+This tool is used for auditing BigCommerce and queries BigCommerce's GraphQL endpoint to pull the information related to the audit. There are currently two audits available in the tool: Price Mismatches (between Celerant and BigCommerce) and Product Weights.
 
-This tool requires SQL database credentials. If you do not have them, ask AJ.
+For Price Mismatches, SKU (product-level, not variant-level) and Price values are pulled in and compared against Celerant to identify price mismatches. It specifically ONLY looks at products in BigCommerce that are "in stock" in order to weed out inactive items with sale prices. This option requires SQL database credentials. If you do not have them, ask AJ.
 
-HOW TO USE:
+For Product Weights, SKU and Weight values are pulled in and sent to a CSV file if under 1 pound. This metric is significant because 1 pound is the threshold to allow USPS First Class mail and we want to be careful about which products we allow that shipping method for considering it needs to fit in an envelope. Products reported in this audit should be checked and have their weight increased to 1 if they should not be available for USPS First Class mail.
 
-1a. Right-click BigCommercePriceChecker.ps1 and select "Run with PowerShell". 
+HOW TO USE PRICE MISMATCHES:
+
+1a. Right-click BigCommercePriceChecker.ps1 and select "Run with PowerShell" and select "1. Price Mismatches". 
 
 1b. Alternatively, Shift + Right-click anywhere in the folder (don't Shift + Right-click the file itself) and select "Open PowerShell window here" to open a PowerShell window first. This will make it so the command prompt window won't close as soon as this tool finishes which will let you inspect the output if you wish. To run the script with this method, type (or copy and paste) the following:
 
@@ -27,3 +29,17 @@ If the difference in price between Celerant and BigCommerce is large (greater th
 This tool would provide much more reliable data if the BigCommerce GraphQL API reliably pulled in all skus but it seems like internally there may have been some things that have changed over the years resulting in variants not appearing in the variants data objects despite appearing as variants in the web interface. Unless and until I can find a solution to that, the data provided will be sketchy. 
 
 All that being said, the information that matters most is the products where **BigCommerce's price is LOWER than Celerant's price**. Sometimes, prices on BigCommerce are slightly higher than in-store and that is intentional, however the inverse should not be true without promos being involved. Therefore, use this tool merely as a guide to understand which products warrant investigation.
+
+HOW TO USE PRODUCT WEIGHT:
+
+1a. Right-click BigCommercePriceChecker.ps1 and select "Run with PowerShell" and select "2. Product Weights". 
+
+1b. Alternatively, Shift + Right-click anywhere in the folder (don't Shift + Right-click the file itself) and select "Open PowerShell window here" to open a PowerShell window first. This will make it so the command prompt window won't close as soon as this tool finishes which will let you inspect the output if you wish. To run the script with this method, type (or copy and paste) the following:
+
+./BigCommercePriceChecker.ps1
+
+2. Allow the script to run then open the ProductWeights.csv file that generates.
+
+3. Both the "Entity" and "SKU" values are searchable within BigCommerce so for each record find the associated product. Give the product a quick glance and make a judgement call on if that is something we could reasonably ship in an envelope. If it cannot, update the weight to 1 pound. If it can, leave it as-is.
+
+4. This data will update in BigCommerce as you update the weights so if you run this option following updating a batch of items, your CSV file should be smaller now that those products do not appear in the CSV file.
