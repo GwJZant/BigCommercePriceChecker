@@ -26,12 +26,9 @@ Write-Host "What do you want to audit?" -ForegroundColor Cyan
 Write-Host "1. Price Mismatches" -ForegroundColor Cyan
 Write-Host "2. Product Weights" -ForegroundColor Cyan
 Write-Host "3. Exit" -ForegroundColor Cyan
-$selection = Read-Host "Enter your selection: "
+$selection = Read-Host "Enter your selection"
 
 if ($selection -eq "1") {
-	# Ask for Username and Password in the console
-	$passSecure = Read-Host "Enter $($config.Celerant.Username) SQL Password" -AsSecureString
-
 	Write-Host "Fetching all products from BigCommerce (this may take a minute)..." -ForegroundColor Cyan
 
 	while ($hasNextPage) {
@@ -106,11 +103,6 @@ if ($selection -eq "1") {
 	# Connect to Celerant Database
 	Write-Host "Connecting to Celerant Database and comparing prices..." -ForegroundColor Cyan
 
-	# Convert to plain text for the SQL Driver
-	$passPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-		[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($passSecure)
-	)
-
 	# Set up SQL parameters
 	$sqlParams = @{
 		ServerInstance         = $config.Celerant.ServerInstance
@@ -122,7 +114,7 @@ if ($selection -eq "1") {
 									WHERE styles.OF5 = ''
 									AND styles.STATUS_FINISH = 'N';" # Adjust your query here
 		Username               = $config.Celerant.Username
-		Password               = $passPlain
+		Password               = $config.Celerant.Password
 		Encrypt                = "Mandatory"
 		TrustServerCertificate = $true
 	}
