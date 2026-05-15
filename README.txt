@@ -1,3 +1,16 @@
+BigCommerceAudit
+Created by: David Barnes
+Requirements: ImportExcel, SqlServer
+
+*******************************************************************************
+* To use this tool you need to install the ImportExcel and SqlServer modules. * 
+* All you need to do is run the below commands in Powershell.                 *
+* It does not require Administrator credentials.                              *
+*                                                                             *
+* Install-Module -Name ImportExcel -Scope CurrentUser -Force                  *     
+* Install-Module -Name SqlServer -Scope CurrentUser -Force                    *
+*******************************************************************************
+
 This tool is used for auditing BigCommerce and queries BigCommerce's GraphQL endpoint to pull the information related to the audit. There are currently two audits available in the tool: Price Mismatches (between Celerant and BigCommerce) and Product Weights.
 
 For Price Mismatches, SKU (product-level, not variant-level) and Price values are pulled in and compared against Celerant to identify price mismatches. It specifically ONLY looks at products in BigCommerce that are "in stock" in order to weed out inactive items with sale prices. This option requires SQL database credentials. If you do not have them, ask AJ.
@@ -43,3 +56,14 @@ HOW TO USE PRODUCT WEIGHT:
 3. Both the "Entity" and "SKU" values are searchable within BigCommerce so for each record find the associated product. Give the product a quick glance and make a judgement call on if that is something we could reasonably ship in an envelope. If it cannot, update the weight to 1 pound. If it can, leave it as-is.
 
 4. This data will update in BigCommerce as you update the weights so if you run this option following updating a batch of items, your CSV file should be smaller now that those products do not appear in the CSV file.
+
+HOW TO RUN:
+Right-click BigCommerceAudit.ps1 and select "Run with PowerShell"
+
+Alternatively, Shift + Right-click anywhere in the folder (don't Shift + Right-click the file itself) and select "Open PowerShell window here" to open a PowerShell window first. This will make it so the command prompt window won't close as soon as this tool finishes which will let you inspect the output if you wish. To run the script with this method, type (or copy and paste) the following:
+
+./BigCommerceAudit.ps1
+
+HOW TO INSTALL MODULES:
+Open PowerShell by searching for it with the Start menu or shift + right-click the whitespace of any folder's window and click "Open PowerShell window here"
+Copy and paste the Install-Module commands into PowerShell. If the modules are already installed, they will be ignored.
