@@ -13,23 +13,21 @@ if (Test-Path $configFile) {
 $token = $config.BigCommerce.Token
 $url   = $config.BigCommerce.GraphQLEndpoint
 
-$allBcPrices    = @{} # A 'Hash Table' to store SKU => Price for fast lookup
-$allBcWeights   = @() # list of objects used for Product Weights option
 $hasNextPage    = $true
 $endCursor      = $null
 $productCount   = 0
-$nullSkuCount   = 0
-$noVariantCount = 0
 
 # Menu
 Write-Host "What do you want to audit?" -ForegroundColor Cyan
 Write-Host "1. Price Mismatches" -ForegroundColor Cyan
 Write-Host "2. Product Weights" -ForegroundColor Cyan
-Write-Host "3. Inactivity Checker (Coming Soon)" -ForegroundColor Cyan
+Write-Host "3. Inactivity Checker" -ForegroundColor Cyan
 Write-Host "4. Exit" -ForegroundColor Cyan
 $selection = Read-Host "Enter your selection"
 
 if ($selection -eq "1") {
+	$allBcPrices    = @{} # A 'Hash Table' to store SKU => Price for fast lookup
+	
 	Write-Host "Fetching all products from BigCommerce (this may take a minute)..." -ForegroundColor Cyan
 
 	while ($hasNextPage) {
@@ -113,7 +111,7 @@ if ($selection -eq "1") {
 									ON tickets.STYLE_ID = styles.STYLE_ID
 									AND tickets.STORE_ID = 1
 									WHERE styles.OF5 = ''
-									AND styles.STATUS_FINISH = 'N';" # Adjust your query here
+									AND styles.STATUS_FINISH = 'N';"
 		Username               = $config.Celerant.Username
 		Password               = $config.Celerant.Password
 		Encrypt                = "Mandatory"
@@ -166,6 +164,8 @@ if ($selection -eq "1") {
 		Write-Host "SQL Error: $_" -ForegroundColor DarkRed
 	}
 } elseif ($selection -eq "2") {
+	$allBcWeights   = @() # list of objects used for Product Weights option
+
 	Write-Host "Fetching all products from BigCommerce (this may take a minute)..." -ForegroundColor Cyan
 
 	while ($hasNextPage) {
@@ -247,6 +247,130 @@ if ($selection -eq "1") {
 		
 	$allBcWeights | Where-Object {$_.weightValue -lt 1 } | Sort-Object SKU | Export-Csv -Path ".\ProductWeights.csv" -NoTypeInformation
 	Write-Host "Results exported to ProductWeights.csv" -ForegroundColor Yellow
+} elseif ($selection -eq "3") {
+	$allBcProducts   = @{} # hash table of products, key is product code; value is inactive
+	$sqlFilePath = "$PSScriptRoot\Queries\GetInactiveCelerantProducts.sql"
+	
+	Write-Host "Fetching all products from BigCommerce (this may take a minute)..." -ForegroundColor Cyan
+
+	while ($hasNextPage) {
+		# If we have a cursor, we tell GraphQL where to start the next page
+		$after = if ($endCursor) { "after: `"$endCursor`"" } else { "" }
+		
+		# 2. Define the GraphQL Query
+		# This asks for 50 products, their SKU, and their current price
+		$graphQuery = @{
+			query = "query {
+				site {
+					products (first: 50 $after) {
+						pageInfo { hasNextPage endCursor }
+						edges {
+							node {
+								entityId
+								name
+								inventory {
+									isInStock
+								}
+								sku
+							}
+						}
+					}
+				}
+			}"
+		} | ConvertTo-Json
+		
+		$headers = @{
+			"Authorization" = "Bearer $token"
+			"Content-Type"  = "application/json"
+		}
+
+		$response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $graphQuery
+		
+		# Write-Host "Debug: hasNextPage = $($response.data.site.products.pageInfo.hasNextPage) | Cursor = $($response.data.site.products.pageInfo.endCursor)"
+
+		# Drill down into the data
+		$bcProducts = $response.data.site.products.edges
+
+		foreach ($productEdge in $bcProducts) {
+			$p = $productEdge.node
+			$productCount++
+			
+			if ($p.sku) {
+				$allBcProducts[$p.sku] = [PSCustomObject]@{
+						Entity      = $p.entityId
+						SKU         = $p.sku
+						Name        = $p.name
+						inStock     = $p.inventory.isInStock
+						Inactive    = $false
+					}	
+			} else {
+				# Write-Host "No SKU from entity: $($p.entityId)"
+			}			
+		}
+		
+		# Check if there's another page
+		$hasNextPage = $response.data.site.products.pageInfo.hasNextPage
+		$endCursor   = $response.data.site.products.pageInfo.endCursor
+
+		if ($productCount % 500 -eq 0) {
+			Write-Host "Collected $($allBcProducts.Count) SKUs from $($productCount) Products so far..."
+		}
+	}
+
+	Write-Host "Total: Collected $($allBcProducts.Count) SKUs from $($productCount) Products."
+
+	# Connect to Celerant Database
+	Write-Host "Connecting to Celerant Database and comparing prices..." -ForegroundColor Cyan
+
+	# Set up SQL parameters
+	$sqlParams = @{
+		ServerInstance         = $config.Celerant.ServerInstance
+		Database               = $config.Celerant.Database
+		InputFile              = $sqlFilePath
+		Username               = $config.Celerant.Username
+		Password               = $config.Celerant.Password
+		Encrypt                = "Mandatory"
+		TrustServerCertificate = $true
+	}
+
+	try {
+		$posData = Invoke-Sqlcmd @sqlParams
+		
+		$notFoundInBC = 0
+		$foundInBC = 0
+
+		foreach ($row in $posData) {
+			$style       = $row.Style
+			$productName = $row.Description
+			$dept        = $row.Dept
+			$season      = $row.Season
+			$inactive    = $row.Inactive
+			
+			if ([string]::IsNullOrWhiteSpace($style)) {
+				continue
+			}
+			
+			if ($allBcProducts.ContainsKey($style)) {
+				# Write-Host "Match found for $($style)! BigCommerce Price: $bcPrice Celerant Price: $posPrice"
+				$foundInBC++
+				
+				$allBcProducts[$style].Inactive = $true
+			} else {
+				$notFoundInBC++
+			}
+		}
+
+		# Final Report
+		Write-Host "`nComparison Complete!" -ForegroundColor Green
+		Write-Host "SKUs in POS but missing in BC: $notFoundInBC"
+		
+		if ($allBcProducts.Count -gt 0) {
+			$allBcProducts.Values | Where-Object { $_.Inactive -eq $true } | Sort-Object SKU | Export-Csv -Path ".\BigCommerceInactiveProducts.csv" -NoTypeInformation
+			Write-Host "Results exported to BigCommerceInactiveProducts.csv" -ForegroundColor Yellow
+		}
+	} catch {
+		Write-Host "SQL Error: $_" -ForegroundColor DarkRed
+	} 
 } else {
 	Write-Host "Exiting..." -ForegroundColor Cyan
 }
