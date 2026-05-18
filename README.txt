@@ -66,3 +66,6 @@ Alternatively, Shift + Right-click anywhere in the folder (don't Shift + Right-c
 HOW TO INSTALL MODULES:
 Open PowerShell by searching for it with the Start menu or shift + right-click the whitespace of any folder's window and click "Open PowerShell window here"
 Copy and paste the Install-Module commands into PowerShell. If the modules are already installed, they will be ignored.
+
+TODO:
+	Add Inactivity Checker (Read in all BigCommerce products and match them with Celerant entries. If 0 OH and of a certain Season (DISCO, NSTOCK), output to file)

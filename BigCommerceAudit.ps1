@@ -25,7 +25,8 @@ $noVariantCount = 0
 Write-Host "What do you want to audit?" -ForegroundColor Cyan
 Write-Host "1. Price Mismatches" -ForegroundColor Cyan
 Write-Host "2. Product Weights" -ForegroundColor Cyan
-Write-Host "3. Exit" -ForegroundColor Cyan
+Write-Host "3. Inactivity Checker (Coming Soon)" -ForegroundColor Cyan
+Write-Host "4. Exit" -ForegroundColor Cyan
 $selection = Read-Host "Enter your selection"
 
 if ($selection -eq "1") {
